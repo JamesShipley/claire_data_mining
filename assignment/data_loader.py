@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 class DataLoader:
-    CSV_FILE = Path(__file__).parent / 'data.csv'
+    CSV_FILE = Path(__file__).parent / 'static/data.csv'
 
     @classmethod
     def load_to_df(cls) -> pd.DataFrame:
