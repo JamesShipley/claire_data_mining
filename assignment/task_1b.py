@@ -1,5 +1,3 @@
-from statistics import LinearRegression
-
 from assignment.data_loader import DataLoader
 
 
@@ -76,19 +74,10 @@ class Task1B:
         df.loc[cond, "value"] = df.loc[cond, "value"].clip(upper=3600 * 3) # clip to max 3 hours
 
     @classmethod
-    def linear_regr(cls):
-        df = cls.df.groupby(["date", "variable"]).apply(len).unstack().fillna(0)
-        print(df.iloc[20:30].to_string())
-        y = df["mood"]
-        # X = df[[col for col in df.columns if col != "mood"]]
-        X = df.drop(columns="mood")
-        X = df[["screen"]]
-        from sklearn.linear_model import LinearRegression, LogisticRegression
-        model = LinearRegression().fit(X, y)
-        print(model.score(X, y))
-        # print(model.coef_)
+    def impute_missing_values(cls):
+        df = cls.df[cls.df.varaible == "mood"]
+        mean_mood = df.groupby(["id", "date"]).value.mean().unstack(0)
+        print(mean_mood.to_string())
 
 
-
-# Task1B.remove_incorrect_values()
-Task1B.linear_regr()
+Task1B.impute_missing_values()

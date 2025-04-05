@@ -144,6 +144,7 @@ class Task1A:
             plt.show()
 
 
-# Task1A.time_plot()
-# Task1A.variables_distribution_of_values()
-Task1A.main()
+if __name__ == '__main__':
+    # Task1A.time_plot()
+    # Task1A.variables_distribution_of_values()
+    Task1A.main()
