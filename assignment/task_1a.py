@@ -102,17 +102,51 @@ class Task1A:
     @classmethod
     def variables_distribution_of_values(cls):
         print(len(cls.df.variable.unique()))
-        fig, axes = plt.subplots(len(cls.df.variable.unique()) // 4 + 1, 4, figsize=(12, 10))
+        fig, axes = plt.subplots(len(cls.df.variable.unique()) // 4 + 1, 4, figsize=(20, 12))
         axfl = axes.flatten()
 
         for (group, sdf), ax in zip(cls.df.groupby("variable"), axfl):
-            # ax.hist(sdf.value, bins=30, alpha=0.7, color='b')  # Histogram (normalized)
-            ax.plot(sdf.value)
+            ax.hist(sdf.value, bins=30, alpha=0.7, color='b')  # Histogram (normalized)
+            # ax.plot
             ax.set_title(group)
             ax.grid(True)
         plt.suptitle("Distribution of values of each variable")
         plt.tight_layout()
         plt.show()
+
+        fig, axes = plt.subplots(len(cls.df.id.unique()) // 3, 3, figsize=(20, 20))
+        axfl = axes.flatten()
+        #
+        # for (group, sdf), ax in zip(cls.df.groupby("variable"), axfl):
+        #     # ax.hist(sdf.value, bins=30, alpha=0.7, color='b')  # Histogram (normalized)
+        #     record_count = sdf.groupby(["id", "date"]).apply(len).unstack(0).fillna(0)
+        #     print(record_count)
+        #     ax.plot(record_count.index, record_count, label=group)
+        #     ax.set_title(group)
+        #     ax.grid(True)
+        record_count = cls.df.groupby(["id", "date", "variable"]).apply(len).unstack().fillna(0)
+        record_count_mood = record_count["mood"].unstack(0).fillna(0)
+        for i, uid in enumerate(record_count_mood.columns):
+            ax=axfl[i]
+            ax.plot(record_count_mood.index, record_count_mood[uid], label=uid)
+            ax.set_title(uid)
+            ax.grid(True)
+            # Rotate x-axis labels
+            for label in ax.get_xticklabels():
+                label.set_rotation(45)
+            # truncated_labels = [label.strftime('%m-%d') for label in record_count_mood.index]
+            # print(truncated_labels)
+            # ax.set_xticklabels(truncated_labels, rotation=45, ha="right")
+        plt.suptitle("Distribution of values of mood over dates")
+        plt.tight_layout()
+        plt.show()
+
+        # for uid in record_count_mood.columns:
+        #     plt.plot(record_count_mood.index, record_count_mood[uid], label=uid)
+        #     plt.suptitle("Distribution of values of mood over dates")
+        #     plt.tight_layout()
+        #     plt.show()
+
 
     @classmethod
     def count_extreme_values_in_each_appCat(cls):
@@ -237,24 +271,38 @@ class Task1A:
 
     @classmethod
     def data_relationships(cls):
-        raise NotImplementedError(
-            """
-            You need to think about whether this can be shown in 1c or not - it is much easier to find relationships
-            on the cleaned data using machine learning techniques than using basic plots / manually combing through
-            data.
-            
-            The most basic is just df.cov() on the cleaned + aggregated data.
-            """
-        )
+        """
+        You need to think about whether this can be shown in 1c or not - it is much easier to find relationships
+        on the cleaned data using machine learning techniques than using basic plots / manually combing through
+        data.
+
+        The most basic is just df.cov() on the cleaned + aggregated data.
+        """
+        ...
+
+        df = cls.df.groupby(["id", "date", "variable"]).apply(len).unstack().fillna(0)
+        # print(df[df["circumplex.arousal"] != 0].to_string())
+        # print(len((df[df["circumplex.arousal"] != 0 & df["circumplex.valence"] != 0].index)) / len((df[df["mood"] != 0].index)))
+        print(len(df[(df["circumplex.arousal"] != 0) & (df["circumplex.valence"] != 0) & (df["mood"] != 0)].index) / len((df[df["mood"] != 0].index)))
+        print(
+            len(df[(df["activity"] != 0) & (df["mood"] != 0)].index) / len(
+                (df[df["mood"] != 0].index)))
+        print(
+            len(df[(df["screen"] != 0) & (df["mood"] != 0)].index) / len(
+                (df[df["mood"] != 0].index)))
+
+        # print(
+        #     len(df[(df["screen"] != 0) & (df[df.index.startswith('appCat')] != 0)]) / len(
+        #         (df[df["screen"] != 0].index)))
 
     @classmethod
     def main(cls):
         # cls.text()
         # cls.variables_distribution_of_values()
         # cls.plot1()
-        # cls.data_relationships()
+        cls.data_relationships()
         # cls.plot3()
-        cls.count_extreme_values_in_each_appCat()
+        # cls.count_extreme_values_in_each_appCat()
 
     @classmethod
     def time_plot(cls):
@@ -270,7 +318,4 @@ class Task1A:
             plt.title(date)
             plt.show()
 
-
-# Task1A.time_plot()
-# Task1A.variables_distribution_of_values()
 Task1A.main()
