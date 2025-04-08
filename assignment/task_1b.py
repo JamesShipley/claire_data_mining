@@ -43,14 +43,43 @@ class Task1B:
         }
         has_invalid_data = cls.df.variable.unique()
         print(no_invalid_data.symmetric_difference(has_invalid_data))
-
         print(
             """
             from observing the data we found that only the 'appCat' variables had what could be described
             as extreme or incorrect values. These are time values measured in seconds - so we removed any values that
-            were less than 1 second or more than 3 hours 
+            were less than 1 second and set a value ceiling of 3 hours. 
+            
+            We consider this to be a good approach as it only removes a very small minority of the data, as opposed to
+            a quantile-based approach which is guaranteed to remove a certain percentage of data regardless of whether
+            it is erroneous or not. 
+            
+            - As the values are seconds, negative points should not be considered at all.
+            - As we are planning on aggregating later, removing records of less than 1 second is unlikely
+              to have a significant effect on our data
+            - As this is data about time spent on apps, it is likely that a time exceeding 3 hours is due to someone
+              accidentally leaving their phone on but is not actually using it - especially in the case of 
+              non-entertainment apps such as `office` or `builtin`, and especially since the data is recorded in 2014,
+              when people where less obsessed with their phones.
+            
+            From Figure !REF we can see that there are leading and trailing days where no mood data was recorded.
+            Given that there was little data recorded in general on these days, we think it is sensible to remove these
+            leading and trailing days from the dataset.
             """
         )
+        df = cls.df.copy()
 
+        # remove time records that are less than 1 second
+        df = df[~df.variable.str.startswith("appCat") | (df.value > 1)]
+        # clip to max 3 hours
+        cond = df.variable.str.startswith("appCat")
+        df.loc[cond, "value"] = df.loc[cond, "value"].clip(upper=3600 * 3)
+        return df
 
-Task1B.remove_incorrect_values()
+    @classmethod
+    def impute_missing_values(cls):
+        df = cls.df[cls.df.variable == "mood"]
+        mean_mood = df.groupby(["id", "date"]).value.mean().unstack(0)
+        print(mean_mood.to_string())
+
+if __name__ == '__main__':
+    Task1B.impute_missing_values()
