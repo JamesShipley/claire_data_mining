@@ -69,15 +69,17 @@ class Task1B:
         df = cls.df.copy()
 
         # remove time records that are less than 1 second
-        df = df[~(df.variable.str.startswith("appCat") & df.value < 1)]
+        df = df[~df.variable.str.startswith("appCat") | (df.value > 1)]
+        # clip to max 3 hours
         cond = df.variable.str.startswith("appCat")
-        df.loc[cond, "value"] = df.loc[cond, "value"].clip(upper=3600 * 3) # clip to max 3 hours
+        df.loc[cond, "value"] = df.loc[cond, "value"].clip(upper=3600 * 3)
+        return df
 
     @classmethod
     def impute_missing_values(cls):
-        df = cls.df[cls.df.varaible == "mood"]
+        df = cls.df[cls.df.variable == "mood"]
         mean_mood = df.groupby(["id", "date"]).value.mean().unstack(0)
         print(mean_mood.to_string())
 
-
-Task1B.impute_missing_values()
+if __name__ == '__main__':
+    Task1B.impute_missing_values()

@@ -1,4 +1,5 @@
 from assignment.data_loader import DataLoader
+from assignment.task_1b import Task1B
 
 
 class Task1C:
@@ -20,4 +21,11 @@ class Task1C:
 
     @classmethod
     def aggregate_data(cls):
-        df = cls.df.copy()
+        df = Task1B.remove_incorrect_values()
+        print(df.variable.unique())
+        # sum_agg = df.groupby(["id", "date", "variable"]).value.sum().unstack().fillna(0) / 60
+        # print(sum_agg.head().to_string())
+
+
+if __name__ == '__main__':
+    Task1C.aggregate_data()
