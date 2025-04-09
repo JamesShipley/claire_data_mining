@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+import pandas as pd
+
 from assignment.data_loader import DataLoader
 from assignment.task_1b import Task1B
 
@@ -17,15 +21,45 @@ class Task1C:
     For the feature engineering, you are going to focus on such a transformation in this part of the assignment.
     This is illustrated in Figure 1.
     """
-    df = DataLoader.load_to_df()
+    df = Task1B.remove_incorrect_values()
+    @classmethod
+    def get_y(cls) -> pd.DataFrame:
+        y = cls.df[cls.df.variable == "mood"].groupby(["id", "date"]).value.mean().reset_index()
+        y["date"] += timedelta(days=1)
+        return y.set_index(["id", "date"]).value.rename("y")
 
     @classmethod
-    def aggregate_data(cls):
-        df = Task1B.remove_incorrect_values()
+    def aggregate_data_1day(cls):
+        df = cls.df
         print(df.variable.unique())
-        # sum_agg = df.groupby(["id", "date", "variable"]).value.sum().unstack().fillna(0) / 60
-        # print(sum_agg.head().to_string())
+
+        sum_cols = [
+            "appCat.builtin",
+            "appCat.communication",
+            "appCat.entertainment",
+            "appCat.finance",
+            "appCat.game",
+            "appCat.office",
+            "appCat.other",
+            "appCat.social",
+            "appCat.travel",
+            "appCat.unknown",
+            "appCat.utilities",
+            "appCat.weather",
+            "call",
+            "sms",
+            "screen"
+        ]
+        group = df.groupby(["id", "date", "variable"]).value
+        sum_agg = group.sum().unstack()[sum_cols]
+        mean_agg = group.mean().unstack().drop(columns=sum_cols)
+        assert set(df.variable.unique()) == set(sum_agg.columns) | set(mean_agg.columns)
+        agg = sum_agg.join(mean_agg)
+        print(f"dropping  {agg.mood.isna().sum()} / {len(agg)} rows")
+        return agg[agg.mood.notna()].fillna(0)
 
 
-if __name__ == '__main__':
-    Task1C.aggregate_data()
+# if __name__ == '__main__':
+#     X = Task1C.aggregate_data_1day()
+#     y = Task1C.get_y()
+#     Xy = X.join(y)
