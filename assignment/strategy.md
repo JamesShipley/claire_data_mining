@@ -9,7 +9,7 @@ how many attributes: \[id (string), time (datetime), variable (string), value (f
 --> ranges of values
     --> id: we have data for 27 users
     --> datetime: the data spans over 113 days, from 2024-02-17 to 2024-06-09
-    --> variables
+    --> variables: 19
                               count        min        max     mean  median
     --> variable                                                          
     --> mood                   5641      1.000     10.000    6.993   7.000
