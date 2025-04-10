@@ -290,6 +290,14 @@ class Task1A:
             len(df[(df["screen"] != 0) & (df["mood"] != 0)].index) / len(
                 (df[df["mood"] != 0].index)))
 
+        # df = cls.df.groupby(["id", "datetime", "variable"]).apply(len).unstack()
+        cnt = 0
+        for group, sdf in list(cls.df.groupby(["id", "datetime", "variable"])):
+            if len(sdf) > 1:
+                cnt += 1
+                print(sdf.to_string())
+        print(cnt)
+
         # print(
         #     len(df[(df["screen"] != 0) & (df[df.index.startswith('appCat')] != 0)]) / len(
         #         (df[df["screen"] != 0].index)))

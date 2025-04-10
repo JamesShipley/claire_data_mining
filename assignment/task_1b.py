@@ -1,6 +1,12 @@
-from os import remove
+from typing import List
 
+import seaborn as sns
 import pandas as pd
+from matplotlib import pyplot as plt
+from pygments.lexer import include
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer, KNNImputer
+from sklearn.preprocessing import MinMaxScaler
 
 from assignment.data_loader import DataLoader
 
@@ -33,10 +39,53 @@ class Task1B:
     """
     df = DataLoader.load_to_df()
 
+
     def show_missing_data(self):
         record_count = self.df.groupby(["id", "date", "variable"]).apply(len).unstack().fillna(0)
         record_count.columns = [i for i, c in enumerate(record_count.columns)]
         print(record_count.to_string())
+
+    @staticmethod
+    def impute_missing_values(trimmed_data: pd.DataFrame, method: int = 1) -> pd.DataFrame:
+        df = trimmed_data.drop(columns = ["id", "date", "average_mood"])
+        df2 = trimmed_data[["id", "date", "average_mood"]].reset_index(drop=True)
+        if method == 1:
+            imp_mean = IterativeImputer(random_state=0, n_nearest_features=3)
+            IterativeImputer(random_state=0)
+            imputed = pd.DataFrame(imp_mean.fit_transform(df), columns=df.columns).reset_index(drop=True)
+            combined_df = pd.concat([df2, imputed], axis=1, ignore_index=True)
+            combined_df.columns = trimmed_data.columns
+            combined_df.to_csv('static/df_per_day_imputed_1.csv')
+
+        else:
+            imputer = KNNImputer(n_neighbors=2)
+            imputed = pd.DataFrame(imputer.fit_transform(df), columns=df.columns).reset_index(drop=True)
+            combined_df = pd.concat([df2, imputed], axis=1, ignore_index=True)
+            combined_df.columns = trimmed_data.columns
+            combined_df.to_csv('static/df_per_day_imputed_2.csv')
+        return combined_df
+
+    @staticmethod
+    def feature_engineering(imputed_data: pd.DataFrame) -> pd.DataFrame:
+        # df = df.drop(columns = ["id", "date", "group"])
+        # corr = df.corr('spearman')
+        # fig, ax = plt.subplots(figsize=(25, 15))
+        # sns.heatmap(corr, vmax=0.9, annot=True, cmap="Blues", square=True)
+        # plt.title("Correlation matrix of features")
+        # plt.savefig(f"static/figs/Correlation_Matrix_after.png", dpi=300)
+        # plt.show()
+        # plt.close()
+        imputed_data['total_professional'] = imputed_data[['total_office', 'total_finance']].sum(axis=1, skipna=True)
+        imputed_data['total_recreation'] = imputed_data[['total_game', 'total_entertainment', 'total_social']].sum(
+            axis=1, skipna=True)
+        imputed_data['total_convenience'] = imputed_data[['total_travel', 'total_utilities', 'total_weather']].sum(
+            axis=1, skipna=True)
+        imputed_data['total_other'] = imputed_data[['total_other', 'total_unknown']].sum(axis=1, skipna=True)
+        column_names = ['total_entertainment', 'total_finance', 'total_game', 'total_office', 'total_social',
+                        'total_travel', 'total_unknown', 'total_utilities', 'total_weather']
+        imputed_data = imputed_data.drop(columns=column_names, axis=1)
+        imputed_data.to_csv('static/df_per_day_agg.csv')
+        return imputed_data
 
     """remove incorrect values before we aggregate data by day"""
     @staticmethod
@@ -84,28 +133,13 @@ class Task1B:
         # df.loc[cond, "value"] = df.loc[cond, "value"].clip(upper=3600 * 3)
         return df
 
-
     """
     - df unit: per day
-    remove all row in which values of mood is nan
-    drop all time chunks that have less than 6 data as the length of our time window is 6 (5 predict 1)
+    1. remove all row in which values of mood is nan
+    2. drop all time chunks that have less than 6 data as the length of our time window is 6 (5 predict 1)
     """
     @staticmethod
     def trim_values(df: pd.DataFrame) -> pd.DataFrame:
-        # nan_mask = df['average_mood'].isna()
-        #
-        # # Find indices where there are 3 consecutive NaNs
-        # consecutive_nan_1 = nan_mask.rolling(window=5, center=True, min_periods=1).sum() > 2
-        # consecutive_nan_2 = nan_mask.rolling(window=3, center=True, min_periods=1).sum() >= 2
-        # consecutive_nan_3 = nan_mask.rolling(window=5, min_periods=1).sum() >= 2
-        #
-        # # print(consecutive_nan)
-        #
-        # # Filter the DataFrame
-        # filtered_df = df[~consecutive_nan_1]
-        # filtered_df = filtered_df[~consecutive_nan_2]
-        # filtered_df = filtered_df[~consecutive_nan_3]
-
         df = df.dropna(subset=["average_mood"])
         df['date'] = pd.to_datetime(df['date'])
         df['date_diff'] = df['date'].diff().dt.days
@@ -122,31 +156,67 @@ class Task1B:
         return filtered_df
 
     """
-    
+    define classes for classifier
     """
     @staticmethod
     def set_classes(df: pd.DataFrame) -> pd.DataFrame:
         # Define the bins and labels
-        bins = [0, 2, 4, 6, 7, 8, 9, 10]  # Define the range boundaries
-        labels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # Define the corresponding labels
+        labels = [1, 2, 3, 4, 5]  # Define the corresponding labels
+        quantiles = df['average_mood'].quantile([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).tolist()
+        # quantiles = df['average_mood'].quantile([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).tolist()
 
         # Create a new column for categorized moods
-        df['mood_class'] = pd.cut(df['average_mood'], bins=bins, labels=labels, right=True)
-        print(df["id", "date", "group", "average_mood", "mood_class"].to_string())
+        mood_class = pd.cut(df['average_mood'], bins=quantiles, labels=labels, include_lowest=True)
+        df.insert(2, 'mood_class', mood_class)
+        df.to_csv("static/df_classes.csv")
+        return df
+
+    @staticmethod
+    def normalize_data(agg_data: pd.DataFrame) -> pd.DataFrame:
+        dropped_cols = ["id", "date", "mood_class"]
+        df = agg_data.drop(columns=dropped_cols)
+        df2 = agg_data[dropped_cols].reset_index(drop=True)
+        norm = pd.DataFrame(MinMaxScaler().fit_transform(df)).reset_index(drop=True)
+        combined_df = pd.concat([df2, norm], axis=1, ignore_index=True)
+        combined_df.columns = agg_data.columns
+        return combined_df
+
+    def apply_time_window(self, variables: List[str], df: pd.DataFrame) -> pd.DataFrame:
+        for variable in variables:
+            df[f'last_5day_{variable}'] = df.shift()[variable].rolling(5).mean()
         return df
 
     def get_non_temporal_data(self, df: pd.DataFrame):
         trimmed_data = self.trim_values(df)
-
+        imputed_data = self.impute_missing_values(trimmed_data)
+        agg_data = self.feature_engineering(imputed_data)
         result = []
-        for group, sdf in list(trimmed_data.groupby("group")):
-            sdf['last_5day_avg_mood'] = sdf.shift()["average_mood"].rolling(5).mean()
+        columns = agg_data.columns[3:]
+        for group, sdf in list(agg_data.groupby("group")):
+            sdf['last_5day_average_mood'] = sdf.shift()["average_mood"].rolling(5).mean()
+            self.apply_time_window(columns, sdf)
             result.append(sdf)
         final_df = pd.concat(result, ignore_index=True)
-        final_df[["id", "date", "group", "average_mood", "last_5day_avg_mood"]].to_csv('static/df_non_temporal.csv')
+        final_df = final_df.drop(columns = columns)
+        final_df = final_df.drop(columns= "last_5day_group")
+        final_df.dropna(inplace=True)
+        final_df = self.set_classes(final_df)
+        non_temporal_df = self.normalize_data(final_df)
+        non_temporal_df.to_csv('static/df_non_temporal.csv')
 
-    def get_temporal_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        ...
+    def get_temporal_data(self, df: pd.DataFrame):
+        trimmed_data = self.trim_values(df)
+        imputed_data = self.impute_missing_values(trimmed_data)
+        agg_data = self.feature_engineering(imputed_data)
+        final_df = self.set_classes(agg_data)
+        group_df = final_df[["group"]]
+        final_df.drop(columns= "group", inplace=True)
+        norm_data = self.normalize_data(final_df)
+        norm_data.insert(2, "group", group_df)
+        norm_data.to_csv('static/df_temporal.csv')
+
+
+
 
     def get_values_per_day(self):
         """
