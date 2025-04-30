@@ -1,0 +1,7 @@
+Test Loss : 0.011877
+MSE       : 0.011877
+MAE       : 0.081372
+RMSE      : 0.108981
+Accuracy  : 0.087452 (Threshold=0.01)
+R_Squared      : 0.136911
+Time      : 2025-04-19 22:09:02

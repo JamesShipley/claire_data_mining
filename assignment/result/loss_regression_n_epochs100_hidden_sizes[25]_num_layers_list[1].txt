@@ -1,0 +1,10 @@
+Epoch: 0, train loss: 0.00142
+Epoch: 10, train loss: 0.00053
+Epoch: 20, train loss: 0.00099
+Epoch: 30, train loss: 0.00037
+Epoch: 40, train loss: 0.00159
+Epoch: 50, train loss: 0.00245
+Epoch: 60, train loss: 0.00270
+Epoch: 70, train loss: 0.00365
+Epoch: 80, train loss: 0.00183
+Epoch: 90, train loss: 0.00311

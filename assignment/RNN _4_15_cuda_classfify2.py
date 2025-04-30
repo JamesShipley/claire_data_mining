@@ -3,6 +3,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import math
+
+from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, classification_report
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch.nn.functional as F
@@ -13,6 +15,16 @@ import datetime
 
 import torch.optim as optim
 
+"""
+
+- what is 'group' ? why don't you group by ID ? 
+
+- dropout (.2) seems high maybe?
+
+- for your LSTMRegressor, don't you have to specify which layers are included in your model parameters?
+    - can create m = LSTMRegressor(), and print(len(m.parameters())
+
+"""
 
 def create_sequences(data: pd.DataFrame, labels: pd.DataFrame, seq_type: str) -> Tuple[torch.Tensor, torch.Tensor]:
     time_window = 5
@@ -59,8 +71,8 @@ class LSTMClassifier(nn.Module):
         # Propagate input through LSTM
         output, (hn, cn) = self.lstm(x, (h0, c0))  # (input, hidden, and cell state)
         hn = hn[-1]  # last layer's hidden state
-        out = self.relu(hn)
-        out = self.fc_1(out)  # first dense
+        # out = self.relu(hn)
+        out = self.fc_1(hn)  # first dense
         out = self.relu(out)  # relu
         out = self.fc_2(out)
         out = self.softmax(out)
@@ -80,6 +92,9 @@ class LSTMRegression(nn.Module):
         self.fc_1 = nn.Linear(hidden_size, 128)  # fully connected
         self.fc_2 = nn.Linear(128, output_size)  # fully connected last layer
         self.relu = nn.ReLU()
+        self.sigmoid1 = nn.Sigmoid()
+        self.sigmoid2 = nn.Sigmoid()
+        self.fc_3 = nn.Linear(input_size, output_size)
 
     def forward(self, x):
         # hidden state
@@ -89,10 +104,11 @@ class LSTMRegression(nn.Module):
         # Propagate input through LSTM
         output, (hn, cn) = self.lstm(x, (h0, c0))  # (input, hidden, and cell state)
         hn = hn[-1]  # last layer's hidden state
-        out = self.relu(hn)
+        out = output[:, -1, :]
         out = self.fc_1(out)  # first dense
-        out = self.relu(out)  # relu
+        out = self.relu(out)
         out = self.fc_2(out)
+        # out = self.fc_3(x)
         return out
 
 
@@ -113,7 +129,6 @@ def train_model(n_epochs, model, optimiser, loss_func, train_loader, test_loader
             # print("loss.item(): ", loss.item())
             # print(loss)
             loss.backward()
-            optimiser.step()
             # Update weights
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
             optimiser.step()
@@ -191,7 +206,7 @@ def evaluate_model_classification(model, test_loader, loss_func, save_path) -> L
     return [test_loss, pred_labels, y_labels]
 
 
-def evaluate_model_regression(model, test_loader, loss_func, accuracy_threshold=0.1, save_path='result/evaluation_regression.txt',):
+def evaluate_model_regression(model, test_loader, loss_func, accuracy_threshold=0.01, save_path='result/evaluation_regression.txt',):
     prediction = []
     y_labels = []
     model.eval()
@@ -204,6 +219,8 @@ def evaluate_model_regression(model, test_loader, loss_func, accuracy_threshold=
             inputs = inputs.to(device)
             label = label.to(device)
             outputs = model(inputs)
+            # print("output: ", outputs)
+            # print("label: ", label)
             loss = loss_func(outputs, label)
             test_loss += loss.item() * inputs.size(0)
             prediction.append(outputs)
@@ -259,13 +276,11 @@ def training_pipeline(train_loader: DataLoader, test_loader: DataLoader, model_t
     # Num layers 1, 2, 4,8
 
     n_epochs = 100  # 1000 epochs
-    learning_rates = [0.0005]
+    learning_rates = [0.01]
 
-    input_size = 10  # number of features
+    input_size = 11  # number of features
     hidden_sizes = [25]  # number of features in hidden state [5, 15, 25]
-    num_layers_list = [2]  # number of stacked lstm layers [1, 2, 4]
-
-
+    num_layers_list = [1]  # number of stacked lstm layers [1, 2, 4]
 
     num_classes = 5  # number of output classes
 
@@ -278,7 +293,7 @@ def training_pipeline(train_loader: DataLoader, test_loader: DataLoader, model_t
                 if model_type == "regression":
                     save_path='result/evaluation_regression_n_epochs'+str(n_epochs)+'_hidden_sizes'+str(hidden_sizes)+'_num_layers_list'+str(num_layers_list)+'.txt'
                     save_path_loss='result/loss_regression_n_epochs'+str(n_epochs)+'_hidden_sizes'+str(hidden_sizes)+'_num_layers_list'+str(num_layers_list)+'.txt'
-                    lstm_regression = LSTMRegression(num_classes, input_size, hidden_size, num_layers).to(device)
+                    lstm_regression = LSTMRegression(1, input_size, hidden_size, num_layers).to(device)
                     optimiser = torch.optim.Adam(lstm_regression.parameters(), lr=learning_rate)
                     loss_func = torch.nn.MSELoss()  # mean-squared error for regression
                     trained_model_regression = train_model(n_epochs=n_epochs, model=lstm_regression,
@@ -305,7 +320,7 @@ def training_pipeline(train_loader: DataLoader, test_loader: DataLoader, model_t
                     print(f"Accuracy: {accuracy:.5f}")
 
 def run_model(task_type: str, df: pd.DataFrame):
-    X = df.drop(columns=["Unnamed: 0", "id", "date", "mood_class", "average_mood"])
+    X = df.drop(columns=["Unnamed: 0", "id", "date", "mood_class"])
 
     if task_type == "regression":
         y = df[['group', 'average_mood']]
@@ -317,7 +332,7 @@ def run_model(task_type: str, df: pd.DataFrame):
 
         train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
         training_pipeline(train_loader, test_loader, "regression")
@@ -331,19 +346,34 @@ def run_model(task_type: str, df: pd.DataFrame):
 
         train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
         training_pipeline(train_loader, test_loader, "classification")
 
+
+def plot():
+    df = pd.read_csv('result/pred_vs_true_regression.csv')
+    y_test = df["True"]
+    y_pred = df["Predicted"]
+    plt.scatter(y_test, y_pred, color='blue', label='Data Points', s=10)
+    plt.ylabel('y_pred Label')
+    plt.xlabel('y_test Label')
+    plt.plot(y_test, y_test)
+    plt.show()
+
 if __name__ == '__main__':
     # 检查CUDA是否可用
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     CSV_FILE = 'static/df_temporal.csv'
     df = pd.read_csv(CSV_FILE)
-    # run_model(task_type="regression", df=df)
-    run_model(task_type="classification", df=df)
+    run_model(task_type="regression", df=df)
+    # run_model(task_type="classification", df=df)
+
+    plot()
+
+
 
 
 
